@@ -31,6 +31,7 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 * Multiple weather providers (Weather Underground*, OpenWeatherMap)
 * Current temperature
 * Temperature forecast (red line)
+* UV index forecast (yellow line)
 * Precipitation probability forecast (blue area)
 * City where forecast was fetched
 * Next sunrise or sunset time
