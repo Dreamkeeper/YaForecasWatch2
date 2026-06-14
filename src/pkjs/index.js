@@ -46,6 +46,7 @@ var KEY_LAST_FETCH_ATTEMPT = storageKeys.LAST_FETCH_ATTEMPT_KEY;
 var KEY_GEOCODE_CACHE = storageKeys.GEOCODE_CACHE_KEY;
 var KEY_GEOCODE_BACKOFF = storageKeys.GEOCODE_BACKOFF_KEY;
 var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color_migration';
+var KEY_UV_FIXTURE_CLEANUP = 'uv_fixture_cleanup_v1';
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
 
@@ -136,6 +137,16 @@ Pebble.addEventListener('ready',
             }, function() {
                 sendFixtureWeather(activeFixture);
             });
+            return;
+        }
+        if (localStorage.getItem(KEY_UV_FIXTURE_CLEANUP) === null) {
+            // Replace weather accidentally persisted by an earlier UV dev build
+            // that bundled the deterministic Chicago screenshot fixture.
+            localStorage.removeItem(KEY_LAST_FETCH_SUCCESS);
+            localStorage.setItem(KEY_UV_FIXTURE_CLEANUP, 'complete');
+            app.pendingStartupFetch = false;
+            fetch(app.provider, true);
+            startTick();
             return;
         }
         if (migratedWeekendHolidayColors) {
