@@ -43,7 +43,17 @@ Open source revival of the beloved ForecasWatch watchface. This includes support
 
 *\* Using a hacky workaround*
 
-Yandex Weather currently supplements precipitation probability and UV index graphs with Open-Meteo, because those fields are not available on the Yandex Weather Smart Home free tier.
+## Weather providers
+
+ForecasWatch2 can fetch weather from:
+
+- Weather Underground
+- OpenWeatherMap
+- Yandex Weather
+
+Yandex Weather support is intended to work with the Yandex Weather Smart Home API tier. That tier provides current temperature, feels-like temperature, wind speed, weather conditions, and condition icons. It does not currently expose precipitation probability or UV index fields, so when Yandex Weather is selected ForecasWatch2 supplements only those graph series with Open-Meteo data for the same location.
+
+This means the watchface can still show the normal temperature, rain probability, and UV index graphs while using Yandex Weather as the main provider.
 
 ## Platforms
 
