@@ -73,6 +73,24 @@ function roundDownHourUnixSeconds(date) {
 }
 
 /**
+ * Build the fixed hourly graph window used by the watch.
+ *
+ * @param {number} startTime Unix seconds for the first graph hour.
+ * @param {number} numEntries Number of hourly entries.
+ * @returns {number[]} Unix-second timestamps, one per graph entry.
+ */
+function buildHourlyWindow(startTime, numEntries) {
+    var times = [];
+    var index;
+
+    for (index = 0; index < numEntries; index += 1) {
+        times.push(startTime + index * 60 * 60);
+    }
+
+    return times;
+}
+
+/**
  * Convert an Open-Meteo hour to Unix seconds.
  *
  * @param {string|number} value Open-Meteo hour value.
@@ -183,6 +201,33 @@ function getOpenMeteoByTime(openMeteoData) {
     });
 
     return byTime;
+}
+
+/**
+ * Build hourly temperature values for the fixed graph window.
+ *
+ * @param {{time: number, temp: number}[]} hourly Yandex hourly entries.
+ * @param {number[]} windowTimes Fixed graph window timestamps.
+ * @param {number} fallbackTemp Temperature to use when no forecast point exists.
+ * @returns {number[]} Temperature trend values.
+ */
+function getTempTrendForWindow(hourly, windowTimes, fallbackTemp) {
+    var byTime = {};
+    var trend = [];
+    var lastTemp = fallbackTemp;
+
+    hourly.forEach(function(entry) {
+        byTime[entry.time] = entry.temp;
+    });
+
+    windowTimes.forEach(function(windowTime) {
+        if (typeof byTime[windowTime] === 'number') {
+            lastTemp = byTime[windowTime];
+        }
+        trend.push(lastTemp);
+    });
+
+    return trend;
 }
 
 var YandexProvider = function(apiKey) {
@@ -312,8 +357,8 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
         var now = weatherData.weatherByPoint.now;
         var currentTemp;
         var hourly;
-        var fallbackTemp;
-        var fallbackStartTime;
+        var graphStartTime;
+        var graphWindowTimes;
         var finishWithSupplement;
 
         if (typeof now.temperature !== 'number') {
@@ -323,36 +368,22 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
 
         currentTemp = celsiusToFahrenheit(now.temperature);
         hourly = getHourlyForecast(weatherData);
-        fallbackTemp = currentTemp;
-        fallbackStartTime = roundDownHourUnixSeconds(new Date());
+        graphStartTime = roundDownHourUnixSeconds(new Date());
+        graphWindowTimes = buildHourlyWindow(graphStartTime, this.numEntries);
 
-        if (hourly.length > 0) {
-            this.startTime = hourly[0].time;
-            this.tempTrend = hourly.map(function(entry) {
-                return entry.temp;
-            });
-            fallbackTemp = this.tempTrend[this.tempTrend.length - 1];
-        }
-        else {
-            this.startTime = fallbackStartTime;
-            this.tempTrend = [];
-            hourly = [];
-        }
-
-        while (this.tempTrend.length < this.numEntries) {
-            this.tempTrend.push(fallbackTemp);
-        }
-
+        this.startTime = graphStartTime;
+        this.tempTrend = getTempTrendForWindow(hourly, graphWindowTimes, currentTemp);
         this.currentTemp = currentTemp;
 
         finishWithSupplement = (function(openMeteoData) {
             var openMeteoByTime = openMeteoData ? getOpenMeteoByTime(openMeteoData) : {};
+            var index;
+            var supplement;
 
             this.precipTrend = [];
             this.uvTrend = [];
-            while (this.precipTrend.length < this.numEntries) {
-                var entry = hourly[this.precipTrend.length];
-                var supplement = entry ? openMeteoByTime[entry.time] : null;
+            for (index = 0; index < this.numEntries; index += 1) {
+                supplement = openMeteoByTime[graphWindowTimes[index]];
 
                 this.precipTrend.push(supplement ? supplement.precipProbability : 0);
                 this.uvTrend.push(supplement ? supplement.uvIndex : UV_UNAVAILABLE);
