@@ -103,7 +103,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
     app.telemetry = createTelemetryClient(getRuntimeTelemetryConfig());
     refreshProvider();
     sendClaySettings();
-    holidays.sendHolidayBitsets(app.settings);
+    holidays.sendHolidayBitsets(app.settings, null, appendDebugWeatherLog);
 
     // Fetching goes last, after other settings have been handled
     if (app.settings.fetch === true) {
@@ -144,7 +144,7 @@ Pebble.addEventListener('ready',
             sendClaySettings(function() {
                 holidays.sendHolidayBitsets(app.settings, function() {
                     sendFixtureWeather(activeFixture);
-                });
+                }, appendDebugWeatherLog);
             }, function() {
                 sendFixtureWeather(activeFixture);
             });
@@ -163,7 +163,7 @@ Pebble.addEventListener('ready',
         if (migratedWeekendHolidayColors) {
             sendClaySettings(markWeekendHolidayColorMigrationComplete);
         }
-        holidays.sendHolidayBitsets(app.settings);
+        holidays.sendHolidayBitsets(app.settings, null, appendDebugWeatherLog);
         if (app.pendingStartupFetch) {
             app.pendingStartupFetch = false;
             fetch(app.provider, true);

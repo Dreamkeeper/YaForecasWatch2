@@ -138,25 +138,62 @@ function isStale(cached, nowMs) {
  * @param {number} year Calendar year.
  * @param {Function} onSuccess Success callback.
  * @param {Function} onFailure Failure callback.
+ * @param {Function=} debugLog Optional debug logger.
  * @returns {void}
  */
-function fetchRawCountryYear(countryCode, year, onSuccess, onFailure) {
+function fetchRawCountryYear(countryCode, year, onSuccess, onFailure, debugLog) {
     var rawKey = countryCode + ':' + year;
 
     if (Object.prototype.hasOwnProperty.call(rawCountryYearCache, rawKey)) {
+        if (typeof debugLog === 'function') {
+            debugLog('holiday_raw_cache_hit', {
+                countryCode: countryCode,
+                year: year
+            });
+        }
         onSuccess(rawCountryYearCache[rawKey]);
         return;
+    }
+
+    if (typeof debugLog === 'function') {
+        debugLog('holiday_fetch_start', {
+            countryCode: countryCode,
+            year: year
+        });
     }
 
     WeatherProvider.request(NAGER_BASE_URL + year + '/' + countryCode, 'GET', function(responseText) {
         try {
             rawCountryYearCache[rawKey] = JSON.parse(responseText);
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_fetch_success', {
+                    countryCode: countryCode,
+                    year: year,
+                    rawCount: Array.isArray(rawCountryYearCache[rawKey]) ? rawCountryYearCache[rawKey].length : null
+                });
+            }
             onSuccess(rawCountryYearCache[rawKey]);
         }
         catch (ex) {
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_fetch_failed', {
+                    countryCode: countryCode,
+                    year: year,
+                    error: { code: 'invalid_json', detail: ex.message }
+                });
+            }
             onFailure({ code: 'invalid_json', detail: ex.message });
         }
-    }, onFailure);
+    }, function(error) {
+        if (typeof debugLog === 'function') {
+            debugLog('holiday_fetch_failed', {
+                countryCode: countryCode,
+                year: year,
+                error: error
+            });
+        }
+        onFailure(error);
+    });
 }
 
 /**
@@ -185,15 +222,22 @@ function writeCache(key, source, year, dates) {
  * @param {number} holidaySet Holiday set id.
  * @param {number} year Calendar year.
  * @param {Function} onReady Callback with dates and metadata.
+ * @param {Function=} debugLog Optional debug logger.
  * @returns {void}
  */
-function loadHolidaySetYear(holidaySet, year, onReady) {
+function loadHolidaySetYear(holidaySet, year, onReady, debugLog) {
     var source = HOLIDAY_SOURCES[holidaySet];
     var key;
     var cached;
     var nowMs = Date.now();
 
     if (!source) {
+        if (typeof debugLog === 'function') {
+            debugLog('holiday_cache_disabled', {
+                holidaySet: holidaySet,
+                year: year
+            });
+        }
         onReady([], { status: 'disabled' });
         return;
     }
@@ -206,16 +250,45 @@ function loadHolidaySetYear(holidaySet, year, onReady) {
             var dates = filterHolidayDates(raw, holidaySet);
             var fresh = writeCache(key, source, year, dates);
             console.log('[holidays] refreshed ' + fresh.source + ' dates=' + dates.length);
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_cache_refreshed', {
+                    holidaySet: holidaySet,
+                    countryCode: source.countryCode,
+                    scope: source.scope,
+                    year: year,
+                    dates: dates.length
+                });
+            }
             onReady(dates, { status: 'fresh', source: fresh.source });
         }, function(error) {
             console.log('[holidays] refresh failed for ' + key + ': ' + JSON.stringify(error));
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_cache_refresh_failed', {
+                    holidaySet: holidaySet,
+                    countryCode: source.countryCode,
+                    scope: source.scope,
+                    year: year,
+                    hasStaleCache: Boolean(cached),
+                    error: error
+                });
+            }
             if (!cached) {
                 onReady([], { status: 'failed_empty', error: error });
             }
-        });
+        }, debugLog);
     }
 
     if (cached) {
+        if (typeof debugLog === 'function') {
+            debugLog(isStale(cached, nowMs) ? 'holiday_cache_stale' : 'holiday_cache_hit', {
+                holidaySet: holidaySet,
+                countryCode: source.countryCode,
+                scope: source.scope,
+                year: year,
+                dates: cached.dates.length,
+                fetchedAtUtc: cached.fetchedAtUtc
+            });
+        }
         onReady(cached.dates, {
             status: isStale(cached, nowMs) ? 'stale' : 'cached',
             source: cached.source
@@ -226,6 +299,14 @@ function loadHolidaySetYear(holidaySet, year, onReady) {
         return;
     }
 
+    if (typeof debugLog === 'function') {
+        debugLog('holiday_cache_miss', {
+            holidaySet: holidaySet,
+            countryCode: source.countryCode,
+            scope: source.scope,
+            year: year
+        });
+    }
     refresh();
 }
 
@@ -296,15 +377,23 @@ function normalizeHolidaySet(value) {
  *
  * @param {Object} settings Clay settings.
  * @param {Function=} onDone Optional completion callback.
+ * @param {Function=} debugLog Optional debug logger.
  * @returns {void}
  */
-function sendHolidayBitsets(settings, onDone) {
+function sendHolidayBitsets(settings, onDone, debugLog) {
     var years = getHolidayYears();
     var jobs = [];
     var slots = [
         { slot: 1, holidaySet: normalizeHolidaySet(settings.holidaySet1) },
         { slot: 2, holidaySet: normalizeHolidaySet(settings.holidaySet2) }
     ];
+
+    if (typeof debugLog === 'function') {
+        debugLog('holiday_sync_start', {
+            years: years,
+            slots: slots
+        });
+    }
 
     slots.forEach(function(slotInfo) {
         years.forEach(function(year) {
@@ -320,6 +409,9 @@ function sendHolidayBitsets(settings, onDone) {
         var job = jobs.shift();
 
         if (!job) {
+            if (typeof debugLog === 'function') {
+                debugLog('holiday_sync_complete', {});
+            }
             if (typeof onDone === 'function') {
                 onDone();
             }
@@ -342,12 +434,33 @@ function sendHolidayBitsets(settings, onDone) {
                     dates: dates.length,
                     status: meta.status
                 }));
+                if (typeof debugLog === 'function') {
+                    debugLog('holiday_send_success', {
+                        slot: job.slot,
+                        holidaySet: job.holidaySet,
+                        year: job.year,
+                        dates: dates.length,
+                        status: meta.status,
+                        source: meta.source || null
+                    });
+                }
                 next();
             }, function(error) {
                 console.log('[holidays] send failed: ' + JSON.stringify(error));
+                if (typeof debugLog === 'function') {
+                    debugLog('holiday_send_failed', {
+                        slot: job.slot,
+                        holidaySet: job.holidaySet,
+                        year: job.year,
+                        dates: dates.length,
+                        status: meta.status,
+                        source: meta.source || null,
+                        error: error
+                    });
+                }
                 next();
             });
-        });
+        }, debugLog);
     }
 
     next();
