@@ -178,13 +178,9 @@ Pebble.addEventListener('ready',
  * @returns {{enabled: boolean, endpoint: string, appVersion: string, buildProfile: string}} Runtime telemetry config.
  */
 function getRuntimeTelemetryConfig() {
-    var telemetry = pkg.telemetry || {};
-    var endpoint = typeof telemetry.endpoint === 'string' ? telemetry.endpoint : '';
-    var telemetryEnabled = !app.settings || app.settings.telemetryEnabled !== false;
-
     return {
-        enabled: telemetryEnabled,
-        endpoint: endpoint,
+        enabled: false,
+        endpoint: '',
         appVersion: pkg.version,
         buildProfile: pkg.buildProfile
     };
@@ -761,8 +757,7 @@ function getDefaultClaySettings() {
         colorHoliday2: DEFAULT_COLOR_HOLIDAY_2,
         showQt: true,
         vibe: false,
-        btIcons: 'both',
-        telemetryEnabled: true
+        btIcons: 'both'
     };
 }
 

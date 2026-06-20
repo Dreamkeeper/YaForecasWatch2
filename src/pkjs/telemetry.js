@@ -218,38 +218,8 @@ function serializeError(value, maxLength) {
  * @returns {{enabled: boolean, trackWeatherFetch: Function}} Telemetry client.
  */
 function createTelemetryClient(options) {
-    var enabled = !options || options.enabled !== false;
-    var endpoint = options && typeof options.endpoint === 'string' ? options.endpoint.trim() : '';
-    var appVersion = options && typeof options.appVersion === 'string' ? options.appVersion : '0.0.0';
-    var buildProfile = options && typeof options.buildProfile === 'string' ? options.buildProfile : 'unknown';
-
-    if (!enabled) {
-        console.log('[telemetry] disabled by user setting');
-    }
-    else if (endpoint === '') {
-        console.log('[telemetry] disabled (no endpoint configured)');
-    }
-    else {
-        console.log('[telemetry] enabled endpoint=' + endpoint);
-    }
-
-    function send(payload) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', endpoint);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        console.log('[telemetry] sending event=' + payload.eventType + ' endpoint=' + endpoint);
-        xhr.onload = function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                console.log('[telemetry] sent event=' + payload.eventType + ' status=' + xhr.status);
-                return;
-            }
-            console.log('[telemetry] non-2xx status=' + xhr.status + ' body=' + xhr.responseText);
-        };
-        xhr.onerror = function() {
-            console.log('[telemetry] request error');
-        };
-        xhr.send(JSON.stringify(payload));
-    }
+    void options;
+    console.log('[telemetry] disabled in YaForecasWatch2');
 
     /**
      * Track one weather fetch attempt.
@@ -258,75 +228,12 @@ function createTelemetryClient(options) {
      * @returns {void}
      */
     function trackWeatherFetch(event) {
-        var accountToken;
-        var watchToken;
-        var watchInfo;
-        var success;
-        var error;
-        var attempt;
-
-        if (!enabled || endpoint === '') {
-            console.log('[telemetry] telemetry disabled');
-            return;
-        }
-
-        try {
-            accountToken = Pebble.getAccountToken();
-        }
-        catch (ex) {
-            console.log('[telemetry] getAccountToken failed: ' + ex.message);
-            return;
-        }
-
-        if (typeof accountToken !== 'string' || accountToken.trim() === '') {
-            console.log('[telemetry] getAccountToken returned empty value');
-            return;
-        }
-
-        try {
-            watchToken = Pebble.getWatchToken();
-        }
-        catch (ex) {
-            watchToken = null;
-            console.log('[telemetry] getWatchToken failed: ' + ex.message);
-        }
-
-        if (typeof watchToken !== 'string' || watchToken.trim() === '') {
-            watchToken = null;
-        }
-
-        watchInfo = buildWatchInfoSnapshot(event.watchInfo);
-        success = Boolean(event.success);
-        error = success ? null : serializeError(event.error, 512);
-        attempt = (
-            typeof event.attempt === 'number' &&
-            isFinite(event.attempt) &&
-            event.attempt >= 1
-        ) ? Math.floor(event.attempt) : null;
-
-        send({
-            eventType: 'weather_fetch',
-            timestampUtc: new Date().toISOString(),
-            accountToken: accountToken,
-            watchToken: watchToken,
-            provider: event.provider,
-            success: success,
-            usedGpsCache: event.usedGpsCache,
-            gpsErrorCode: typeof event.gpsErrorCode === 'number' ? event.gpsErrorCode : null,
-            locationMode: normalizeLocationMode(event.locationMode),
-            error: error,
-            countryCode: normalizeCountryCode(event.countryCode),
-            settings: buildSettingsSnapshot(event.settings),
-            appVersion: appVersion,
-            buildProfile: buildProfile,
-            watchInfo: watchInfo,
-            durationMs: typeof event.durationMs === 'number' ? event.durationMs : null,
-            attempt: attempt
-        });
+        void event;
+        console.log('[telemetry] telemetry disabled');
     }
 
     return {
-        enabled: enabled && endpoint !== '',
+        enabled: false,
         trackWeatherFetch: trackWeatherFetch
     };
 }

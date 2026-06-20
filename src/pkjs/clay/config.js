@@ -335,13 +335,6 @@ var config = [
                     }
                 ]
             },
-            {
-                "type": "toggle",
-                "label": "Share anonymous telemetry",
-                "messageKey": "telemetryEnabled",
-                "defaultValue": true,
-                "description": "<span style=\"color:#9aa0a6;font-size:0.82em;line-height:1.35;\">Share privacy-respecting weather telemetry to improve reliability and understand usage patterns. Learn more about what gets sent in the <a href=\"https://github.com/Dreamkeeper/YaForecasWatch2#telemetry\">Telemetry section</a>.</span>"
-            },
         ]
     },
     {

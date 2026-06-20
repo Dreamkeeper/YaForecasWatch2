@@ -109,9 +109,4 @@ For a new fork, install the repo tools with `mise install`, run `npm install`, t
 
 ## Telemetry
 
-ForecasWatch2 includes privacy-respecting telemetry. I do not collect precise location or API keys. Account and watch identifiers are stored only as server-side HMAC hashes—enough for rough usage stats (e.g. DAU), not as readable IDs.
-
-- Collected: each weather fetch’s outcome and duration, provider, coarse country code when available, app and watch metadata, and an allowlist of non-sensitive settings.
-- Not collected: coordinates (lat/lon), city/state, manual location strings, or your API keys.
-- Purpose: estimate DAU, see coarse country mix, spot weather-fetch failures, and learn which settings are common.
-- You may opt-out of telemetry by disabling it in the settings.
+YaForecasWatch2 does not send telemetry. The fork keeps local debug logging for troubleshooting, but no weather fetches, settings, account tokens, watch tokens, location data, or device metadata are uploaded by production or debug builds.

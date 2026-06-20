@@ -94,11 +94,9 @@ if (ver && Object.prototype.hasOwnProperty.call(releaseNotifications, ver)) {
   pkg.releaseNotification = Object.assign({ enabled: true }, releaseNotifications[ver]);
 }
 
-const telemetryEndpoint = typeof process.env.TELEMETRY_ENDPOINT === 'string' ? process.env.TELEMETRY_ENDPOINT.trim() : '';
-
 pkg.telemetry = {
-  enabled: telemetryEndpoint.length > 0,
-  endpoint: telemetryEndpoint,
+  enabled: false,
+  endpoint: '',
 };
 
 fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
