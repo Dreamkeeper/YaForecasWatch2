@@ -8,7 +8,8 @@
 #define LEFT_AXIS_LABEL_TO_GRAPH_GAP 2
 #define LEFT_AXIS_GRAPH_INSET_DEFAULT (LEFT_AXIS_LABEL_STRIP_MIN_W + LEFT_AXIS_LABEL_TO_GRAPH_GAP)
 #define RIGHT_UV_AXIS_W 19
-#define UV_AXIS_TICK_W 3
+#define UV_AXIS_MINOR_TICK_W 2
+#define UV_AXIS_MAJOR_TICK_W 5
 #define UV_AXIS_LABEL_GAP 2
 #define TEMP_LABEL_PAD 2
 #define TEMP_LABEL_H 20
@@ -124,16 +125,18 @@ static void draw_uv_axis(GContext *ctx, GRect graph_plot_rect)
     for (int uv_index = 1; uv_index <= UV_INDEX_MAX; ++uv_index)
     {
         const int16_t tick_y = axis_bottom - uv_index * graph_plot_rect.size.h / UV_INDEX_MAX;
-        graphics_draw_line(ctx, GPoint(axis_x, tick_y), GPoint(axis_x + UV_AXIS_TICK_W, tick_y));
+        const bool is_major_tick = uv_index == 5 || uv_index == 10;
+        const int16_t tick_w = is_major_tick ? UV_AXIS_MAJOR_TICK_W : UV_AXIS_MINOR_TICK_W;
+        graphics_draw_line(ctx, GPoint(axis_x, tick_y), GPoint(axis_x + tick_w, tick_y));
 
-        if (uv_index == 5 || uv_index == 10)
+        if (is_major_tick)
         {
             char label[3];
             snprintf(label, sizeof(label), "%d", uv_index);
             graphics_draw_text(ctx, label,
                                fonts_get_system_font(FONT_KEY_GOTHIC_14),
-                               GRect(axis_x + UV_AXIS_TICK_W + UV_AXIS_LABEL_GAP, tick_y - 8,
-                                     RIGHT_UV_AXIS_W - UV_AXIS_TICK_W - UV_AXIS_LABEL_GAP, 16),
+                               GRect(axis_x + UV_AXIS_MAJOR_TICK_W + UV_AXIS_LABEL_GAP, tick_y - 8,
+                                     RIGHT_UV_AXIS_W - UV_AXIS_MAJOR_TICK_W - UV_AXIS_LABEL_GAP, 16),
                                GTextOverflowModeFill,
                                GTextAlignmentLeft,
                                NULL);
