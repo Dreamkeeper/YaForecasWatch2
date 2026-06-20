@@ -6,10 +6,10 @@
   "keywords": [
     "pebble-app"
   ],
-  "homepage": "https://github.com/Dreamkeeper/forecaswatch2-dk",
+  "homepage": "https://github.com/Dreamkeeper/YaForecasWatch2",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Dreamkeeper/forecaswatch2-dk.git"
+    "url": "https://github.com/Dreamkeeper/YaForecasWatch2.git"
   },
   "private": true,
   "dependencies": {

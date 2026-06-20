@@ -137,11 +137,7 @@ static HolidayMatch holiday_match(struct tm *t) {
     return match;
 }
 
-static bool is_configured_holiday(struct tm *t) {
-    HolidayMatch match = holiday_match(t);
-    return match.slot_1 || match.slot_2;
-}
-
+#ifdef PBL_COLOR
 static GColor holiday_color(HolidayMatch match) {
     if (match.slot_1) {
         return g_config->color_holiday_1;
@@ -152,7 +148,6 @@ static GColor holiday_color(HolidayMatch match) {
     return GColorWhite;
 }
 
-#ifdef PBL_COLOR
 static GRect holiday_highlight_rect(GRect cell_rect) {
 #ifdef PBL_PLATFORM_EMERY
     // emery: keep the chip large enough for the larger calendar font.
@@ -238,13 +233,16 @@ static void calendar_update_proc(Layer *layer, GContext *ctx) {
     for (int i = 0; i < NUM_WEEKS * DAYS_PER_WEEK; ++i) {
         struct tm t = relative_tm(i - i_today);
         HolidayMatch match = holiday_match(&t);
-        bool highlight_holiday = (config_highlight_holidays() && is_configured_holiday(&t));
+        bool highlight_holiday = (config_highlight_holidays() && (match.slot_1 || match.slot_2));
         bool highlight_sunday = (config_highlight_sundays() && t.tm_wday == 0);
         bool highlight_saturday = (config_highlight_saturdays() && t.tm_wday == 6);
         bool bold = (i == i_today) || highlight_holiday || highlight_sunday || highlight_saturday;
+#ifdef PBL_COLOR
         GColor text_color = (i == i_today) ? gcolor_legible_over(today_color())
-                                           : (highlight_holiday ? gcolor_legible_over(holiday_color(match))
-                                                                : PBL_IF_COLOR_ELSE(date_color(&t), GColorWhite));
+                                           : (highlight_holiday ? gcolor_legible_over(holiday_color(match)) : date_color(&t));
+#else
+        GColor text_color = (i == i_today) ? GColorBlack : GColorWhite;
+#endif
         char buffer[4];
         GFont font = fonts_get_system_font(bold ? CALENDAR_FONT_KEY_BOLD : CALENDAR_FONT_KEY);
         GRect cell_rect = calendar_cell_rect(bounds, i);

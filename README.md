@@ -27,7 +27,7 @@ Changes relative to the original ForecasWatch2 watchface:
 
 The current source for this fork is available at:
 
-https://github.com/Dreamkeeper/forecaswatch2-dk
+https://github.com/Dreamkeeper/YaForecasWatch2
 
 ## Original ForecasWatch2 description
 
