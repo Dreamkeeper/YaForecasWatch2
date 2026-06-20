@@ -5,7 +5,7 @@
 
 enum key {
     TEMP_LO, TEMP_HI, TEMP_TREND, PRECIP_TREND, FORECAST_START, CITY, SUN_EVENT_START_TYPE, SUN_EVENT_TIMES, NUM_ENTRIES,
-    CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND
+    CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR
 }; // Deprecated: BATTERY_LEVEL
 
 void persist_init() {
@@ -68,6 +68,9 @@ void persist_init() {
         };
         persist_set_config(config);
     }
+    if (!persist_exists(DEBUG_FETCH_ERROR)) {
+        persist_write_bool(DEBUG_FETCH_ERROR, false);
+    }
 }
 
 bool persist_has_forecast_data() {
@@ -129,6 +132,10 @@ int persist_get_config(Config *config) {
     return persist_read_data(CONFIG, config, sizeof(Config));
 }
 
+bool persist_get_debug_fetch_error() {
+    return persist_read_bool(DEBUG_FETCH_ERROR);
+}
+
 void persist_set_temp_lo(int val) {
     persist_write_int(TEMP_LO, val);
 }
@@ -176,4 +183,8 @@ void persist_set_sun_event_times(time_t *data, const size_t size) {
 void persist_set_config(Config config) {
     persist_write_data(CONFIG, &config, sizeof(Config));
     config_refresh();  // Refresh global config variable
+}
+
+void persist_set_debug_fetch_error(bool val) {
+    persist_write_bool(DEBUG_FETCH_ERROR, val);
 }

@@ -4,7 +4,7 @@ set -euo pipefail
 
 profile="dev"
 
-if [[ "${1:-}" == "release" || "${1:-}" == "dev" ]]; then
+if [[ "${1:-}" == "release" || "${1:-}" == "dev" || "${1:-}" == "debug" ]]; then
   profile="$1"
   shift
 fi
@@ -19,5 +19,11 @@ node scripts/prepare-fixture.js
 pebble build "$@"
 
 if [[ "$profile" == "dev" ]]; then
-  cp build/forecaswatch2.pbw build/forecaswatch2-dev.pbw
+  pbw_path="$(ls -t build/*.pbw | head -n 1)"
+  cp "$pbw_path" build/forecaswatch2-dev.pbw
+fi
+
+if [[ "$profile" == "debug" ]]; then
+  pbw_path="$(ls -t build/*.pbw | head -n 1)"
+  cp "$pbw_path" build/YaForecasWatch2-debug.pbw
 fi

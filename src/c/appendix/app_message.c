@@ -2,6 +2,7 @@
 #include "persist.h"
 #include "math.h"
 #include "c/layers/forecast_layer.h"
+#include "c/layers/time_layer.h"
 #include "c/layers/weather_status_layer.h"
 #include "c/layers/loading_layer.h"
 #include "c/layers/calendar_layer.h"
@@ -20,6 +21,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *current_temp_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_TEMP);
     Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
     Tuple *sun_events_tuple = dict_find(iterator, MESSAGE_KEY_SUN_EVENTS);
+    Tuple *debug_fetch_error_tuple = dict_find(iterator, MESSAGE_KEY_DEBUG_FETCH_ERROR);
 
     // Clay config options
     Tuple *clay_celsius_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_CELSIUS);
@@ -74,6 +76,10 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         weather_status_layer_refresh();
         calendar_layer_refresh();
         calendar_status_layer_refresh();
+    }
+    else if (debug_fetch_error_tuple) {
+        persist_set_debug_fetch_error((bool)debug_fetch_error_tuple->value->uint8);
+        time_layer_refresh();
     }
     else if (clay_celsius_tuple && clay_time_lead_zero_tuple && clay_axis_12h_tuple && clay_start_mon_tuple && clay_prev_week_tuple
         && clay_color_today_tuple && clay_time_font_tuple && clay_vibe_tuple && clay_show_qt_tuple && clay_show_bt_tuple

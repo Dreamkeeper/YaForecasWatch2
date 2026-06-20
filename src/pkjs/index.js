@@ -44,6 +44,7 @@ var KEY_MAX_NOTIFIED_VERSION = 'max_notified_version';
 var KEY_FETCH_ATTEMPT = storageKeys.FETCH_ATTEMPT_KEY;
 var KEY_LAST_FETCH_SUCCESS = storageKeys.LAST_FETCH_SUCCESS_KEY;
 var KEY_LAST_FETCH_ATTEMPT = storageKeys.LAST_FETCH_ATTEMPT_KEY;
+var KEY_DEBUG_WEATHER_LOG = storageKeys.DEBUG_WEATHER_LOG_KEY;
 var KEY_GEOCODE_CACHE = storageKeys.GEOCODE_CACHE_KEY;
 var KEY_GEOCODE_BACKOFF = storageKeys.GEOCODE_BACKOFF_KEY;
 var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color_migration';
@@ -52,6 +53,7 @@ var DEFAULT_WEATHER_REFRESH_MINUTES = 30;
 var YANDEX_WEATHER_REFRESH_MINUTES = 60;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
+var IS_DEBUG_BUILD = pkg.buildProfile === 'debug';
 
 app.fetchInProgress = false;
 app.pendingStartupFetch = false;
@@ -84,6 +86,7 @@ Pebble.addEventListener('showConfiguration', function(e) {
     // Set the userData here rather than in the Clay() constructor so it's actually up to date
     clay.meta.userData.lastFetchSuccess = localStorage.getItem(KEY_LAST_FETCH_SUCCESS);
     clay.meta.userData.lastFetchAttempt = localStorage.getItem(KEY_LAST_FETCH_ATTEMPT);
+    clay.meta.userData.debugWeatherLog = localStorage.getItem(KEY_DEBUG_WEATHER_LOG);
     Pebble.openURL(clay.generateUrl());
     console.log('Showing clay: ' + JSON.stringify(getClaySettings()));
 });
@@ -484,6 +487,91 @@ function resetFetchAttemptCounter() {
     localStorage.setItem(KEY_FETCH_ATTEMPT, '0');
 }
 
+/**
+ * Append a copy-friendly weather diagnostic entry in debug builds.
+ *
+ * @param {string} event Event name.
+ * @param {Object=} details Small JSON-safe details object.
+ * @returns {void}
+ */
+function appendDebugWeatherLog(event, details) {
+    var entries;
+    var raw;
+
+    if (!IS_DEBUG_BUILD) {
+        return;
+    }
+
+    raw = localStorage.getItem(KEY_DEBUG_WEATHER_LOG);
+    try {
+        entries = raw ? JSON.parse(raw) : [];
+    }
+    catch (ex) {
+        entries = [];
+    }
+
+    if (!Array.isArray(entries)) {
+        entries = [];
+    }
+
+    entries.push({
+        time: new Date().toISOString(),
+        event: event,
+        details: details || {}
+    });
+
+    while (entries.length > 50) {
+        entries.shift();
+    }
+
+    raw = JSON.stringify(entries);
+    while (raw.length > 8192 && entries.length > 1) {
+        entries.shift();
+        raw = JSON.stringify(entries);
+    }
+
+    localStorage.setItem(KEY_DEBUG_WEATHER_LOG, raw);
+}
+
+/**
+ * Show or clear the debug fetch marker on the watch.
+ *
+ * @param {boolean} hasError True when the debug marker should be visible.
+ * @returns {void}
+ */
+function sendDebugFetchError(hasError) {
+    var payload;
+
+    if (!IS_DEBUG_BUILD) {
+        return;
+    }
+
+    payload = {
+        DEBUG_FETCH_ERROR: hasError ? 1 : 0
+    };
+
+    Pebble.sendAppMessage(payload, function() {
+        console.log('[debug] Fetch error marker sent: ' + JSON.stringify(payload));
+    }, function(e) {
+        console.log('[debug] Fetch error marker failed: ' + JSON.stringify(e));
+        appendDebugWeatherLog('debug_marker_send_failed', e || {});
+    });
+}
+
+/**
+ * Return provider warnings recorded during an otherwise successful fetch.
+ *
+ * @param {Object} provider Weather provider instance.
+ * @returns {Object[]} Warning list.
+ */
+function getProviderWarnings(provider) {
+    if (!provider || !Array.isArray(provider.warnings)) {
+        return [];
+    }
+
+    return provider.warnings.slice(0);
+}
+
 function startTick() {
     console.log('Tick from PKJS!');
     tryFetch(app.provider);
@@ -873,8 +961,11 @@ function sendFixtureWeather(fixture) {
     console.log('[fixture] Sending weather fixture: ' + (fixture.name || '(unknown)'));
     Pebble.sendAppMessage(payload, function() {
         console.log('[fixture] Weather fixture sent successfully');
+        sendDebugFetchError(false);
     }, function(e) {
         console.log('[fixture] Weather fixture failed: ' + JSON.stringify(e));
+        appendDebugWeatherLog('fixture_weather_send_failed', e || {});
+        sendDebugFetchError(true);
     });
 }
 
@@ -900,6 +991,12 @@ function fetch(provider, force) {
     }
 
     console.log('Fetching from ' + provider.name);
+    appendDebugWeatherLog('fetch_start', {
+        provider: provider.id,
+        providerName: provider.name,
+        force: Boolean(force),
+        location: app.settings ? app.settings.location : null
+    });
     app.fetchInProgress = true;
     var fetchStart = Date.now();
     var attempt = incrementFetchAttemptCounter();
@@ -912,11 +1009,22 @@ function fetch(provider, force) {
     try {
         provider.fetch(
             function() {
+                var warnings = getProviderWarnings(provider);
                 // Sucess, update recent fetch time
                 app.fetchInProgress = false;
                 localStorage.setItem(KEY_LAST_FETCH_SUCCESS, JSON.stringify(fetchStatus));
                 resetFetchAttemptCounter();
                 console.log('Successfully fetched weather!');
+                appendDebugWeatherLog(warnings.length > 0 ? 'fetch_success_with_warnings' : 'fetch_success', {
+                    provider: provider.id,
+                    warnings: warnings,
+                    usedGpsCache: provider.usedGpsCache,
+                    gpsErrorCode: provider.gpsErrorCode,
+                    locationMode: provider.locationMode,
+                    countryCode: provider.countryCode,
+                    durationMs: Date.now() - fetchStart
+                });
+                sendDebugFetchError(warnings.length > 0);
                 maybeTrackWeatherFetch({
                     provider: provider.id,
                     success: true,
@@ -934,6 +1042,16 @@ function fetch(provider, force) {
                 // Failure
                 app.fetchInProgress = false;
                 console.log('[!] Provider failed to update weather: ' + JSON.stringify(failure));
+                appendDebugWeatherLog('fetch_failed', {
+                    provider: provider.id,
+                    failure: failure,
+                    usedGpsCache: provider.usedGpsCache,
+                    gpsErrorCode: provider.gpsErrorCode,
+                    locationMode: provider.locationMode,
+                    countryCode: provider.countryCode,
+                    durationMs: Date.now() - fetchStart
+                });
+                sendDebugFetchError(true);
                 var attemptStatus = {
                     time: fetchStatus.time,
                     id: fetchStatus.id,
@@ -961,6 +1079,11 @@ function fetch(provider, force) {
     catch (e) {
         app.fetchInProgress = false;
         console.log('Weather fetch threw synchronously: ' + e.message);
+        appendDebugWeatherLog('fetch_exception', {
+            provider: provider && provider.id,
+            message: e.message
+        });
+        sendDebugFetchError(true);
     }
 }
 

@@ -21,6 +21,29 @@ module.exports = function (minified) {
         }
     }
 
+    /**
+     * Format a rolling debug log for a copy-friendly textarea.
+     *
+     * @param {string|null} value Raw JSON string.
+     * @returns {string} Human-readable log text.
+     */
+    function formatDebugWeatherLog(value) {
+        var entries = parseStoredJson(value);
+
+        if (!Array.isArray(entries) || entries.length === 0) {
+            return 'No debug log yet.';
+        }
+
+        return entries.map(function(entry) {
+            var details = entry && entry.details ? entry.details : {};
+            return [
+                entry.time || '(no time)',
+                entry.event || '(event)',
+                JSON.stringify(details)
+            ].join(' | ');
+        }).join('\n');
+    }
+
     clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
         var clayFetch;
         var clayOwmApiKey;
@@ -41,6 +64,7 @@ module.exports = function (minified) {
         var attemptTime;
         var attemptText;
         var shouldShowLastAttempt;
+        var debugWeatherLog;
 
         clayFetch = clayConfig.getItemByMessageKey('fetch');
         clayFetch.set(false);
@@ -105,6 +129,16 @@ module.exports = function (minified) {
                     $('#lastAttemptBlock').ht(attemptText);
                 }
             }
+        }
+
+        debugWeatherLog = $('#debugWeatherLog');
+        if (debugWeatherLog.length > 0) {
+            debugWeatherLog.set('value', formatDebugWeatherLog(clayConfig.meta.userData.debugWeatherLog));
+            debugWeatherLog.on('|click', function() {
+                if (this[0] && typeof this[0].select === 'function') {
+                    this[0].select();
+                }
+            });
         }
 
         // Override submit handler to force re-fetch if provider config changed

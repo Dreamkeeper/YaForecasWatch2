@@ -4,8 +4,8 @@ set -euo pipefail
 
 profile="${1:-dev}"
 
-if [[ "$profile" != "release" && "$profile" != "dev" ]]; then
-  printf 'usage: %s [release|dev]\n' "$0" >&2
+if [[ "$profile" != "release" && "$profile" != "dev" && "$profile" != "debug" ]]; then
+  printf 'usage: %s [release|dev|debug]\n' "$0" >&2
   exit 1
 fi
 

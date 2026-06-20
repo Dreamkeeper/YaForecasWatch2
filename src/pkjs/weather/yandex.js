@@ -392,10 +392,11 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
             onSuccess();
         }).bind(this);
 
-        this.withOpenMeteoResponse(lat, lon, finishWithSupplement, function(error) {
+        this.withOpenMeteoResponse(lat, lon, finishWithSupplement, (function(error) {
             console.log('Open-Meteo supplement unavailable: ' + JSON.stringify(error));
+            this.warnings.push(error || { stage: 'provider_data', code: 'openmeteo_unknown_error' });
             finishWithSupplement(null);
-        });
+        }).bind(this));
     }).bind(this), onFailure);
 };
 

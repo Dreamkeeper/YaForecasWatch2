@@ -1,7 +1,8 @@
 var meta = require('../../../package.json');
-var versionLabel = "v" + meta.version + (meta.buildProfile === "dev" ? " (dev)" : "");
+var profileLabel = meta.buildProfile === "release" ? "" : " (" + meta.buildProfile + ")";
+var versionLabel = "v" + meta.version + profileLabel;
 
-module.exports = [
+var config = [
     {
         "type": "heading",
         "defaultValue": "ForecasWatch2"
@@ -288,4 +289,22 @@ module.exports = [
         "type": "text",
         "defaultValue": versionLabel
     }
-]
+];
+
+if (meta.buildProfile === "debug") {
+    config.splice(config.length - 2, 0, {
+        "type": "section",
+        "items": [
+            {
+                "type": "heading",
+                "defaultValue": "Debug"
+            },
+            {
+                "type": "text",
+                "defaultValue": "<textarea id='debugWeatherLog' readonly style='box-sizing:border-box;width:100%;min-height:180px;background:#202124;color:#f1f3f4;border:1px solid #5f6368;border-radius:4px;padding:8px;font-family:monospace;font-size:12px;line-height:1.35;white-space:pre-wrap;'>No debug log yet.</textarea>"
+            }
+        ]
+    });
+}
+
+module.exports = config;

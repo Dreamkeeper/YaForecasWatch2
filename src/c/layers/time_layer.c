@@ -1,6 +1,7 @@
 #include "time_layer.h"
 #include "c/appendix/config.h"
 #include "c/appendix/memory_log.h"
+#include "c/appendix/persist.h"
 #include "c/services/watch_services.h"
 
 // MT = Margin Top
@@ -13,11 +14,13 @@
 static TextLayer *s_container_layer;
 static TextLayer *s_time_layer;
 static TextLayer *s_am_pm_layer;
+static TextLayer *s_error_layer;
 
 void time_layer_create(Layer* parent_layer, GRect frame) {
     s_container_layer = text_layer_create(frame);
     s_time_layer = text_layer_create(GRect(0, 0, frame.size.w, frame.size.h));
     s_am_pm_layer = text_layer_create(GRect(0, 0, 30, frame.size.h));
+    s_error_layer = text_layer_create(GRect(0, 0, 16, frame.size.h));
 
     text_layer_set_background_color(s_container_layer, GColorClear);
 
@@ -33,8 +36,15 @@ void time_layer_create(Layer* parent_layer, GRect frame) {
     text_layer_set_text(s_am_pm_layer, "PM");
     text_layer_set_text_alignment(s_am_pm_layer, GTextAlignmentLeft);
 
+    text_layer_set_font(s_error_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+    text_layer_set_background_color(s_error_layer, GColorClear);
+    text_layer_set_text_color(s_error_layer, PBL_IF_COLOR_ELSE(GColorRed, GColorWhite));
+    text_layer_set_text(s_error_layer, "!");
+    text_layer_set_text_alignment(s_error_layer, GTextAlignmentCenter);
+
     layer_add_child(text_layer_get_layer(s_container_layer), text_layer_get_layer(s_time_layer));
     layer_add_child(text_layer_get_layer(s_time_layer), text_layer_get_layer(s_am_pm_layer));
+    layer_add_child(text_layer_get_layer(s_container_layer), text_layer_get_layer(s_error_layer));
     layer_add_child(parent_layer, text_layer_get_layer(s_container_layer));
     MEMORY_LOG_HEAP("after_time_layer_create");
 
@@ -66,6 +76,7 @@ void time_layer_tick() {
     text_layer_move_frame(s_time_layer, GRect(0, 0, bounds.size.w, bounds.size.h)); // Reset for size calculation
     GSize time_size = text_layer_get_content_size(s_time_layer);
     GSize am_pm_size = text_layer_get_content_size(s_am_pm_layer);
+    GSize error_size = text_layer_get_content_size(s_error_layer);
 
     // Calculate some landmarks
     int content_w = time_size.w + (g_config->show_am_pm ? am_pm_size.w : 0);
@@ -93,6 +104,20 @@ void time_layer_tick() {
         text_layer_move_frame(s_am_pm_layer, GRect(time_size.w, am_pm_y, 30, time_size.h));
     }
     layer_set_hidden(text_layer_get_layer(s_am_pm_layer), !g_config->show_am_pm);
+
+    const int error_w = 16;
+    const int error_x_max = bounds.size.w - error_w;
+    int error_x = text_left + content_w + 2;
+    int error_text_h = error_size.h - MT_TIME;
+    int error_y = -MT_TIME + (bounds.size.h / 2 - error_text_h / 2);
+    if (error_x > error_x_max) {
+        error_x = error_x_max;
+    }
+    if (error_x < 0) {
+        error_x = 0;
+    }
+    text_layer_move_frame(s_error_layer, GRect(error_x, error_y, error_w, error_size.h));
+    layer_set_hidden(text_layer_get_layer(s_error_layer), !persist_get_debug_fetch_error());
 }
 
 void time_layer_refresh() {
@@ -103,6 +128,8 @@ void time_layer_refresh() {
 
 void time_layer_destroy() {
     MEMORY_LOG_HEAP("time_layer_destroy:before");
+    text_layer_destroy(s_error_layer);
+    text_layer_destroy(s_am_pm_layer);
     text_layer_destroy(s_time_layer);
     text_layer_destroy(s_container_layer);
     MEMORY_LOG_HEAP("time_layer_destroy:after");
