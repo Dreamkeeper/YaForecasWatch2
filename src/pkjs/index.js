@@ -43,6 +43,7 @@ var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 var app = {};  // Namespace for global app variables
 var KEY_MAX_NOTIFIED_VERSION = 'max_notified_version';
 var KEY_FETCH_ATTEMPT = storageKeys.FETCH_ATTEMPT_KEY;
+var KEY_FETCH_BACKOFF = storageKeys.FETCH_BACKOFF_KEY;
 var KEY_LAST_FETCH_SUCCESS = storageKeys.LAST_FETCH_SUCCESS_KEY;
 var KEY_LAST_FETCH_ATTEMPT = storageKeys.LAST_FETCH_ATTEMPT_KEY;
 var KEY_DEBUG_WEATHER_LOG = storageKeys.DEBUG_WEATHER_LOG_KEY;
@@ -52,6 +53,8 @@ var KEY_V1_34_0_WEEKEND_HOLIDAY_COLOR_MIGRATION = 'v1.34.0_weekend_holiday_color
 var KEY_UV_FIXTURE_CLEANUP = 'uv_fixture_cleanup_v1';
 var DEFAULT_WEATHER_REFRESH_MINUTES = 30;
 var YANDEX_WEATHER_REFRESH_MINUTES = 60;
+var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
+var YANDEX_QUOTA_BACKOFF_MS = 24 * 60 * 60 * 1000;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
 var DEFAULT_COLOR_HOLIDAY_2 = pebbleColors.GColorVividCerulean;
@@ -80,7 +83,7 @@ Pebble.addEventListener('appmessage', function(e) {
 
     if (app.provider) {
         app.pendingStartupFetch = false;
-        fetch(app.provider, true);
+        fetch(app.provider, true, false);
     }
 });
 
@@ -108,7 +111,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
     // Fetching goes last, after other settings have been handled
     if (app.settings.fetch === true) {
         console.log('Force fetch!');
-        fetch(app.provider, true);
+        fetch(app.provider, true, true);
     }
     console.log('Closing clay: ' + JSON.stringify(getClaySettings()));
 });
@@ -156,7 +159,7 @@ Pebble.addEventListener('ready',
             localStorage.removeItem(KEY_LAST_FETCH_SUCCESS);
             localStorage.setItem(KEY_UV_FIXTURE_CLEANUP, 'complete');
             app.pendingStartupFetch = false;
-            fetch(app.provider, true);
+            fetch(app.provider, true, false);
             startTick();
             return;
         }
@@ -166,7 +169,7 @@ Pebble.addEventListener('ready',
         holidays.sendHolidayBitsets(app.settings, null, appendDebugWeatherLog);
         if (app.pendingStartupFetch) {
             app.pendingStartupFetch = false;
-            fetch(app.provider, true);
+            fetch(app.provider, true, false);
         }
         startTick();
     }
@@ -487,6 +490,110 @@ function incrementFetchAttemptCounter() {
  */
 function resetFetchAttemptCounter() {
     localStorage.setItem(KEY_FETCH_ATTEMPT, '0');
+}
+
+/**
+ * Read all provider fetch cooldowns from localStorage.
+ *
+ * @returns {Object} Fetch cooldown map.
+ */
+function readFetchBackoffMap() {
+    var raw = localStorage.getItem(KEY_FETCH_BACKOFF);
+    var parsed;
+
+    if (raw === null) {
+        return {};
+    }
+
+    try {
+        parsed = JSON.parse(raw);
+    }
+    catch (ex) {
+        localStorage.removeItem(KEY_FETCH_BACKOFF);
+        return {};
+    }
+
+    return parsed && typeof parsed === 'object' ? parsed : {};
+}
+
+/**
+ * Return the active cooldown record for a provider.
+ *
+ * @param {string} providerId Weather provider id.
+ * @returns {{until: number, reason: string}|null} Cooldown record, or null when inactive.
+ */
+function getActiveFetchBackoff(providerId) {
+    var backoffMap = readFetchBackoffMap();
+    var record = backoffMap[providerId];
+
+    if (!record || typeof record.until !== 'number') {
+        return null;
+    }
+
+    if (Date.now() >= record.until) {
+        delete backoffMap[providerId];
+        localStorage.setItem(KEY_FETCH_BACKOFF, JSON.stringify(backoffMap));
+        return null;
+    }
+
+    return record;
+}
+
+/**
+ * Clear a provider fetch cooldown after success or explicit force refresh.
+ *
+ * @param {string} providerId Weather provider id.
+ * @returns {void}
+ */
+function clearFetchBackoff(providerId) {
+    var backoffMap = readFetchBackoffMap();
+
+    if (Object.prototype.hasOwnProperty.call(backoffMap, providerId)) {
+        delete backoffMap[providerId];
+        localStorage.setItem(KEY_FETCH_BACKOFF, JSON.stringify(backoffMap));
+    }
+}
+
+/**
+ * Return the cooldown duration after a failed weather fetch.
+ *
+ * @param {Object} provider Weather provider instance.
+ * @param {{stage: string, code: string}} failure Fetch failure object.
+ * @returns {number} Cooldown duration in milliseconds.
+ */
+function getFailureBackoffMs(provider, failure) {
+    var code = failure && failure.code;
+
+    if (provider && provider.id === 'yandex') {
+        if (code === 'yandex_status_403' || code === 'yandex_status_429') {
+            return YANDEX_QUOTA_BACKOFF_MS;
+        }
+    }
+
+    return DEFAULT_FETCH_FAILURE_BACKOFF_MS;
+}
+
+/**
+ * Persist a fetch cooldown after provider failure.
+ *
+ * @param {Object} provider Weather provider instance.
+ * @param {{stage: string, code: string}} failure Fetch failure object.
+ * @returns {{until: number, durationMs: number, reason: string}} Stored cooldown record.
+ */
+function writeFetchBackoff(provider, failure) {
+    var providerId = provider && provider.id ? provider.id : 'unknown';
+    var durationMs = getFailureBackoffMs(provider, failure);
+    var backoffMap = readFetchBackoffMap();
+    var record = {
+        until: Date.now() + durationMs,
+        durationMs: durationMs,
+        reason: failure && failure.code ? failure.code : 'unknown_error'
+    };
+
+    backoffMap[providerId] = record;
+    localStorage.setItem(KEY_FETCH_BACKOFF, JSON.stringify(backoffMap));
+
+    return record;
 }
 
 /**
@@ -1026,10 +1133,14 @@ function sendFixtureWeather(fixture) {
 
 /**
  * @typedef {import("./weather/provider")} WeatherProvider
- * @param {WeatherProvider} provider 
- * @param {boolean} force 
+ * @param {WeatherProvider} provider Weather provider instance.
+ * @param {boolean} force Force provider cache refresh.
+ * @param {boolean=} bypassFetchBackoff Allow an explicit user refresh through cooldown.
+ * @returns {void}
  */
-function fetch(provider, force) {
+function fetch(provider, force, bypassFetchBackoff) {
+    var activeBackoff;
+
     if (!isWatchConnected()) {
         console.log('Skipping weather fetch: no watch connected.');
         return;
@@ -1043,6 +1154,23 @@ function fetch(provider, force) {
     if (typeof provider.isGeocodeBackoffActive === 'function' && provider.isGeocodeBackoffActive()) {
         console.log('Skipping weather fetch: geocoding is in backoff cooldown.');
         return;
+    }
+
+    activeBackoff = getActiveFetchBackoff(provider.id);
+    if (activeBackoff !== null && !bypassFetchBackoff) {
+        console.log('Skipping weather fetch: provider is in fetch cooldown.');
+        appendDebugWeatherLog('fetch_skipped_backoff', {
+            provider: provider.id,
+            force: Boolean(force),
+            reason: activeBackoff.reason,
+            until: new Date(activeBackoff.until).toISOString(),
+            remainingMs: Math.max(0, activeBackoff.until - Date.now())
+        });
+        return;
+    }
+
+    if (activeBackoff !== null && bypassFetchBackoff) {
+        clearFetchBackoff(provider.id);
     }
 
     console.log('Fetching from ' + provider.name);
@@ -1069,6 +1197,7 @@ function fetch(provider, force) {
                 app.fetchInProgress = false;
                 localStorage.setItem(KEY_LAST_FETCH_SUCCESS, JSON.stringify(fetchStatus));
                 resetFetchAttemptCounter();
+                clearFetchBackoff(provider.id);
                 console.log('Successfully fetched weather!');
                 appendDebugWeatherLog(warnings.length > 0 ? 'fetch_success_with_warnings' : 'fetch_success', {
                     provider: provider.id,
@@ -1095,12 +1224,16 @@ function fetch(provider, force) {
                 });
             },
             function(failure) {
+                var backoffRecord;
                 // Failure
                 app.fetchInProgress = false;
+                backoffRecord = writeFetchBackoff(provider, failure);
                 console.log('[!] Provider failed to update weather: ' + JSON.stringify(failure));
                 appendDebugWeatherLog('fetch_failed', {
                     provider: provider.id,
                     failure: failure,
+                    backoffUntil: new Date(backoffRecord.until).toISOString(),
+                    backoffDurationMs: backoffRecord.durationMs,
                     usedGpsCache: provider.usedGpsCache,
                     gpsErrorCode: provider.gpsErrorCode,
                     locationMode: provider.locationMode,
