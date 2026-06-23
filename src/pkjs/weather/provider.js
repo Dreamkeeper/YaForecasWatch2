@@ -608,6 +608,13 @@ WeatherProvider.prototype.getPayload = function() {
     var temps = this.tempTrend.slice(0, this.numEntries).map(function(temperature) {
         return Math.round(temperature);
     });
+    var feelsLikeTrend = Array.isArray(this.feelsLikeTrend) ? this.feelsLikeTrend : [];
+    var feelsLikeTemps = [];
+    for (var index = 0; index < this.numEntries; index += 1) {
+        feelsLikeTemps.push(typeof feelsLikeTrend[index] === 'number' && isFinite(feelsLikeTrend[index])
+            ? Math.round(feelsLikeTrend[index])
+            : -32768);
+    }
     var precips = this.precipTrend.slice(0, this.numEntries).map(function(probability) {
         return Math.round(probability * 100);
     });
@@ -619,12 +626,15 @@ WeatherProvider.prototype.getPayload = function() {
     });
     var tempsIntView = new Int16Array(temps);
     var tempsByteArray = Array.prototype.slice.call(new Uint8Array(tempsIntView.buffer));
+    var feelsLikeTempsIntView = new Int16Array(feelsLikeTemps);
+    var feelsLikeTempsByteArray = Array.prototype.slice.call(new Uint8Array(feelsLikeTempsIntView.buffer));
     var sunEventsIntView = new Int32Array(this.sunEvents.map(function(sunEvent) {
         return sunEvent.date.getTime() / 1000; // Seconds since epoch
     }));
     var sunEventsByteArray = Array.prototype.slice.call(new Uint8Array(sunEventsIntView.buffer));
     var payload = {
         TEMP_TREND_INT16: tempsByteArray,
+        FEELS_LIKE_TREND_INT16: feelsLikeTempsByteArray,
         PRECIP_TREND_UINT8: precips, // Holds values within [0,100]
         UV_TREND_UINT8: uvIndices, // 255 means unavailable
         FORECAST_START: this.startTime,

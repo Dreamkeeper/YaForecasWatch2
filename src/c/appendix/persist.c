@@ -8,7 +8,7 @@ enum key {
     CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR,
     HOLIDAY_SLOT1_YEAR0, HOLIDAY_SLOT1_YEAR1, HOLIDAY_SLOT1_YEAR2,
     HOLIDAY_SLOT2_YEAR0, HOLIDAY_SLOT2_YEAR1, HOLIDAY_SLOT2_YEAR2,
-    DEBUG_WEATHER_STATE
+    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
@@ -34,6 +34,10 @@ void persist_init() {
     if (!persist_exists(TEMP_TREND)) {
         int16_t data[] = {2, 2, 2, 4, 7, 9, 11, 12, 12, 12, 11, 9};
         persist_write_data(TEMP_TREND, (void*) data, 12*sizeof(int16_t));
+    }
+    if (!persist_exists(FEELS_LIKE_TREND)) {
+        int16_t data[] = {-32768, -32768, -32768, -32768, -32768, -32768, -32768, -32768, -32768, -32768, -32768, -32768};
+        persist_write_data(FEELS_LIKE_TREND, (void*) data, 12*sizeof(int16_t));
     }
     if (!persist_exists(PRECIP_TREND)) {
         uint8_t data[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -117,6 +121,10 @@ int persist_get_temp_hi() {
 
 int persist_get_temp_trend(int16_t *buffer, const size_t buffer_size) {
     return persist_read_data(TEMP_TREND, (void*) buffer, buffer_size * sizeof(int16_t));
+}
+
+int persist_get_feels_like_trend(int16_t *buffer, const size_t buffer_size) {
+    return persist_read_data(FEELS_LIKE_TREND, (void*) buffer, buffer_size * sizeof(int16_t));
 }
 
 int persist_get_precip_trend(uint8_t *buffer, const size_t buffer_size) {
@@ -205,6 +213,10 @@ void persist_set_temp_hi(int val) {
 
 void persist_set_temp_trend(int16_t *data, const size_t size) {
     persist_write_data(TEMP_TREND, (void*) data, size * sizeof(int16_t));
+}
+
+void persist_set_feels_like_trend(int16_t *data, const size_t size) {
+    persist_write_data(FEELS_LIKE_TREND, (void*) data, size * sizeof(int16_t));
 }
 
 void persist_set_precip_trend(uint8_t *data, const size_t size) {

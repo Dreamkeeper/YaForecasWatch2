@@ -40,6 +40,8 @@
 #define MAX_FORECAST_ENTRIES 24
 #define UV_INDEX_MAX 11
 #define UV_INDEX_UNAVAILABLE 255
+#define FEELS_LIKE_UNAVAILABLE (-32767 - 1)
+#define FEELS_LIKE_DOT_RADIUS PBL_IF_COLOR_ELSE(2, 1)
 
 typedef struct
 {
@@ -79,12 +81,18 @@ static int s_label_strip_w = LEFT_AXIS_LABEL_STRIP_MIN_W;
 static char s_buffer_lo[12];
 static char s_buffer_hi[12];
 static GPoint s_points_temp[MAX_FORECAST_ENTRIES];
+static GPoint s_points_feels_like[MAX_FORECAST_ENTRIES];
 static GPoint s_points_precip[MAX_FORECAST_ENTRIES + 2];
 static GPoint s_points_uv[MAX_FORECAST_ENTRIES];
 static GPath s_path_precip_area_under;
 static GPath s_path_precip_top;
 static GPath s_path_temp;
 static GPath s_path_uv;
+
+static bool is_feels_like_available(int16_t temp)
+{
+    return temp != FEELS_LIKE_UNAVAILABLE;
+}
 
 static RenderSpec make_render_spec()
 {
@@ -531,10 +539,13 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     NightSegments night_segments = {0};
     struct tm *forecast_start_local = localtime(&forecast_start);
     int16_t temps[MAX_FORECAST_ENTRIES] = {0};
+    int16_t feels_like_temps[MAX_FORECAST_ENTRIES];
     uint8_t precips[MAX_FORECAST_ENTRIES] = {0};
     uint8_t uv_indices[MAX_FORECAST_ENTRIES];
+    memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
     memset(uv_indices, UV_INDEX_UNAVAILABLE, sizeof(uv_indices));
     persist_get_temp_trend(temps, num_entries);
+    persist_get_feels_like_trend(feels_like_temps, num_entries);
     persist_get_precip_trend(precips, num_entries);
     persist_get_uv_trend(uv_indices, num_entries);
 
@@ -542,6 +553,25 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     // Calculate the temperature range
     int lo, hi;
     min_max(temps, num_entries, &lo, &hi);
+    bool has_feels_like_data = false;
+    if (g_config->show_feels_like)
+    {
+        for (int i = 0; i < num_entries; ++i)
+        {
+            if (is_feels_like_available(feels_like_temps[i]))
+            {
+                has_feels_like_data = true;
+                if (feels_like_temps[i] < lo)
+                {
+                    lo = feels_like_temps[i];
+                }
+                if (feels_like_temps[i] > hi)
+                {
+                    hi = feels_like_temps[i];
+                }
+            }
+        }
+    }
     int range = hi - lo;
     const int temp_plot_h = h - MARGIN_TEMP_H * 2 - BOTTOM_AXIS_H;
     const int range_safe = range > 0 ? range : 1;
@@ -581,6 +611,16 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
             temp_h = (int)(((int32_t)(temp - lo) * temp_plot_h) / range_safe);
         }
         s_points_temp[i] = GPoint(entry_x, h - temp_h - MARGIN_TEMP_H - BOTTOM_AXIS_H);
+
+        if (has_feels_like_data && is_feels_like_available(feels_like_temps[i]))
+        {
+            int feels_like_h = temp_plot_h / 2;
+            if (range > 0)
+            {
+                feels_like_h = (int)(((int32_t)(feels_like_temps[i] - lo) * temp_plot_h) / range_safe);
+            }
+            s_points_feels_like[i] = GPoint(entry_x, h - feels_like_h - MARGIN_TEMP_H - BOTTOM_AXIS_H);
+        }
 
         int uv_index = uv_indices[i];
         if (uv_index != UV_INDEX_UNAVAILABLE)
@@ -703,6 +743,18 @@ static void forecast_update_proc(Layer *layer, GContext *ctx)
     gpath_draw_outline_open(ctx, &s_path_temp);
     MEMORY_HEAP_PROBE_SAMPLE("after_temp_path_draw", &redraw_probe);
 
+    if (has_feels_like_data)
+    {
+        graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(g_config->color_feels_like, GColorWhite));
+        for (int i = 0; i < num_entries; ++i)
+        {
+            if (is_feels_like_available(feels_like_temps[i]))
+            {
+                graphics_fill_circle(ctx, s_points_feels_like[i], FEELS_LIKE_DOT_RADIUS);
+            }
+        }
+    }
+
     // Draw a line for the bottom axis
     graphics_context_set_stroke_color(ctx, render_spec.axis_color);
     graphics_context_set_stroke_width(ctx, 1);
@@ -758,8 +810,39 @@ static GSize temp_label_string_size(const char *text)
 
 static void text_labels_refresh()
 {
-    snprintf(s_buffer_hi, sizeof(s_buffer_hi), "%d", config_localize_temp(persist_get_temp_hi()));
-    snprintf(s_buffer_lo, sizeof(s_buffer_lo), "%d", config_localize_temp(persist_get_temp_lo()));
+    int lo = persist_get_temp_lo();
+    int hi = persist_get_temp_hi();
+
+    if (g_config->show_feels_like)
+    {
+        const int raw_num_entries = persist_get_num_entries();
+        int num_entries = raw_num_entries > MAX_FORECAST_ENTRIES ? MAX_FORECAST_ENTRIES : raw_num_entries;
+        int16_t feels_like_temps[MAX_FORECAST_ENTRIES];
+        if (num_entries < 0)
+        {
+            num_entries = 0;
+        }
+        memset(feels_like_temps, FEELS_LIKE_UNAVAILABLE, sizeof(feels_like_temps));
+        persist_get_feels_like_trend(feels_like_temps, num_entries);
+
+        for (int i = 0; i < num_entries; ++i)
+        {
+            if (is_feels_like_available(feels_like_temps[i]))
+            {
+                if (feels_like_temps[i] < lo)
+                {
+                    lo = feels_like_temps[i];
+                }
+                if (feels_like_temps[i] > hi)
+                {
+                    hi = feels_like_temps[i];
+                }
+            }
+        }
+    }
+
+    snprintf(s_buffer_hi, sizeof(s_buffer_hi), "%d", config_localize_temp(hi));
+    snprintf(s_buffer_lo, sizeof(s_buffer_lo), "%d", config_localize_temp(lo));
 
     int content_w = temp_label_string_width(s_buffer_hi);
     const int w_lo = temp_label_string_width(s_buffer_lo);

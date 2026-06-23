@@ -244,6 +244,20 @@ var config = [
                 "description": "Show hatch shading between sunset and sunrise to distinguish day and night on the forecast graph."
             },
             {
+                "type": "toggle",
+                "label": "Show feels-like temperature",
+                "messageKey": "showFeelsLike",
+                "defaultValue": false,
+                "description": "Show Yandex Weather apparent temperature as dotted points on the temperature graph."
+            },
+            {
+                "type": "color",
+                "label": "Feels-like graph color",
+                "messageKey": "colorFeelsLike",
+                "defaultValue": "#FFFF00",
+                "capabilities": ["COLOR"]
+            },
+            {
                 "type": "radiogroup",
                 "label": "Provider",
                 "messageKey": "provider",

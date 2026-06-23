@@ -57,6 +57,7 @@ var DEFAULT_FETCH_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
 var YANDEX_FETCH_FAILURE_BACKOFF_MS = 60 * 60 * 1000;
 var DEFAULT_COLOR_WHITE = pebbleColors.GColorWhite;
 var DEFAULT_COLOR_FOLLY = pebbleColors.GColorFolly;
+var DEFAULT_COLOR_YELLOW = pebbleColors.GColorYellow;
 var DEFAULT_COLOR_HOLIDAY_2 = pebbleColors.GColorVividCerulean;
 var IS_DEBUG_BUILD = pkg.buildProfile === 'debug';
 var DEBUG_WEATHER_STATE_NORMAL = 0;
@@ -773,6 +774,8 @@ function sendClaySettings(onSuccess, onFailure) {
         "CLAY_COLOR_HOLIDAY_2": app.settings.hasOwnProperty('colorHoliday2') ? app.settings.colorHoliday2 : DEFAULT_COLOR_HOLIDAY_2,
         "CLAY_COLOR_TIME": app.settings.hasOwnProperty('colorTime') ? app.settings.colorTime : DEFAULT_COLOR_WHITE,
         "CLAY_DAY_NIGHT_SHADING": app.settings.hasOwnProperty('dayNightShading') ? app.settings.dayNightShading : true,
+        "CLAY_SHOW_FEELS_LIKE": app.settings.hasOwnProperty('showFeelsLike') ? app.settings.showFeelsLike : false,
+        "CLAY_COLOR_FEELS_LIKE": app.settings.hasOwnProperty('colorFeelsLike') ? app.settings.colorFeelsLike : DEFAULT_COLOR_YELLOW,
     }
     Pebble.sendAppMessage(payload, function() {
         console.log('Message sent successfully: ' + JSON.stringify(payload));
@@ -894,6 +897,8 @@ function getDefaultClaySettings() {
         location: '',
         temperatureUnits: 'f',
         dayNightShading: true,
+        showFeelsLike: false,
+        colorFeelsLike: DEFAULT_COLOR_YELLOW,
         timeLeadingZero: false,
         timeShowAmPm: false,
         axisTimeFormat: '24h',
@@ -1066,7 +1071,8 @@ function isColorSettingKey(key) {
         key === 'colorSaturday' ||
         key === 'colorUSFederal' ||
         key === 'colorHoliday1' ||
-        key === 'colorHoliday2';
+        key === 'colorHoliday2' ||
+        key === 'colorFeelsLike';
 }
 
 /**

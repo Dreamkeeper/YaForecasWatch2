@@ -156,7 +156,7 @@ function parseOpenMeteoUnixSeconds(value) {
  * Normalize Yandex GraphQL hourly forecast entries.
  *
  * @param {Object} weatherData Parsed GraphQL response.
- * @returns {{time: number, temp: number}[]} Sorted forecast entries.
+ * @returns {{time: number, temp: number, feelsLike: number|null}[]} Sorted forecast entries.
  */
 function getHourlyForecast(weatherData) {
     var weatherByPoint = weatherData && weatherData.weatherByPoint;
@@ -188,7 +188,10 @@ function getHourlyForecast(weatherData) {
 
             hourly.push({
                 time: time,
-                temp: celsiusToFahrenheit(hour.temperature)
+                temp: celsiusToFahrenheit(hour.temperature),
+                feelsLike: typeof hour.feelsLike === 'number'
+                    ? celsiusToFahrenheit(hour.feelsLike)
+                    : null
             });
         });
     });
@@ -279,6 +282,35 @@ function getTempTrendForWindow(hourly, windowTimes, fallbackTemp) {
 
     hourly.forEach(function(entry) {
         byTime[entry.time] = entry.temp;
+    });
+
+    windowTimes.forEach(function(windowTime) {
+        if (typeof byTime[windowTime] === 'number') {
+            lastTemp = byTime[windowTime];
+        }
+        trend.push(lastTemp);
+    });
+
+    return trend;
+}
+
+/**
+ * Build hourly apparent temperature values for the fixed graph window.
+ *
+ * @param {{time: number, feelsLike: number|null}[]} hourly Yandex hourly entries.
+ * @param {number[]} windowTimes Fixed graph window timestamps.
+ * @param {number|null} fallbackTemp Apparent temperature to use when no forecast point exists.
+ * @returns {Array} Apparent temperature trend values.
+ */
+function getFeelsLikeTrendForWindow(hourly, windowTimes, fallbackTemp) {
+    var byTime = {};
+    var trend = [];
+    var lastTemp = fallbackTemp;
+
+    hourly.forEach(function(entry) {
+        if (typeof entry.feelsLike === 'number' && isFinite(entry.feelsLike)) {
+            byTime[entry.time] = entry.feelsLike;
+        }
     });
 
     windowTimes.forEach(function(windowTime) {
@@ -437,6 +469,7 @@ function buildYandexCache(weatherData, lat, lon, cityName, countryCode) {
         cityName: cityName,
         countryCode: countryCode,
         currentTemp: currentTemp,
+        currentFeelsLike: typeof now.feelsLike === 'number' ? celsiusToFahrenheit(now.feelsLike) : null,
         hourly: getHourlyForecast(weatherData)
     };
 }
@@ -576,6 +609,8 @@ function populateProviderFromCache(provider, primaryCache, supplementCache, grap
     provider.startTime = graphWindowTimes[0];
     provider.currentTemp = fallbackTemp;
     provider.tempTrend = getTrendFromByTime(primaryByTime, graphWindowTimes, 'temp', fallbackTemp);
+    provider.feelsLikeTrend = getTrendFromByTime(primaryByTime, graphWindowTimes, 'feelsLike',
+        typeof primaryCache.currentFeelsLike === 'number' ? primaryCache.currentFeelsLike : null);
     provider.precipTrend = [];
     provider.uvTrend = [];
 
@@ -832,6 +867,7 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
     this.withYandexResponse(lat, lon, (function(weatherData) {
         var now = weatherData.weatherByPoint.now;
         var currentTemp;
+        var currentFeelsLike;
         var hourly;
         var graphStartTime;
         var graphWindowTimes;
@@ -844,6 +880,7 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
         }
 
         currentTemp = celsiusToFahrenheit(now.temperature);
+        currentFeelsLike = typeof now.feelsLike === 'number' ? celsiusToFahrenheit(now.feelsLike) : null;
         hourly = getHourlyForecast(weatherData);
         graphStartTime = roundDownHourUnixSeconds(new Date());
         graphWindowTimes = buildHourlyWindow(graphStartTime, this.numEntries);
@@ -854,6 +891,7 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
 
         this.startTime = graphStartTime;
         this.tempTrend = getTempTrendForWindow(hourly, graphWindowTimes, currentTemp);
+        this.feelsLikeTrend = getFeelsLikeTrendForWindow(hourly, graphWindowTimes, currentFeelsLike);
         this.currentTemp = currentTemp;
 
         finishWithSupplement = (function(openMeteoData) {

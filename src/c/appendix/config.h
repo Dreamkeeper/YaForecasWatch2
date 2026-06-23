@@ -38,6 +38,8 @@ typedef struct {
     uint8_t holiday_set_2;
     GColor color_holiday_1;
     GColor color_holiday_2;
+    bool show_feels_like;
+    GColor color_feels_like;
 } Config;
 
 extern Config *g_config;

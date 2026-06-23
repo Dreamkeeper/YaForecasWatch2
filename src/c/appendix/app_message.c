@@ -14,6 +14,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     APP_LOG(APP_LOG_LEVEL_INFO, "Message received!");
     // Weather data
     Tuple *temp_trend_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_TREND_INT16);
+    Tuple *feels_like_trend_tuple = dict_find(iterator, MESSAGE_KEY_FEELS_LIKE_TREND_INT16);
     Tuple *precip_trend_tuple = dict_find(iterator, MESSAGE_KEY_PRECIP_TREND_UINT8);
     Tuple *uv_trend_tuple = dict_find(iterator, MESSAGE_KEY_UV_TREND_UINT8);
     Tuple *forecast_start_tuple = dict_find(iterator, MESSAGE_KEY_FORECAST_START);
@@ -50,6 +51,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *clay_color_holiday_2_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_HOLIDAY_2);
     Tuple *clay_color_time_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_TIME);
     Tuple *clay_day_night_shading_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_DAY_NIGHT_SHADING);
+    Tuple *clay_show_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_SHOW_FEELS_LIKE);
+    Tuple *clay_color_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CLAY_COLOR_FEELS_LIKE);
 
     if(temp_trend_tuple && precip_trend_tuple && uv_trend_tuple && forecast_start_tuple && num_entries_tuple
         && current_temp_tuple && city_tuple && sun_events_tuple) {
@@ -66,6 +69,10 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 #endif
         int16_t *temp_data = (int16_t*) temp_trend_tuple->value->data;
         persist_set_temp_trend(temp_data, num_entries);
+        if (feels_like_trend_tuple) {
+            int16_t *feels_like_data = (int16_t*) feels_like_trend_tuple->value->data;
+            persist_set_feels_like_trend(feels_like_data, num_entries);
+        }
         uint8_t *precip_data = (uint8_t*) precip_trend_tuple->value->data;
         persist_set_precip_trend(precip_data, num_entries);
         uint8_t *uv_data = (uint8_t*) uv_trend_tuple->value->data;
@@ -115,7 +122,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         && clay_color_today_tuple && clay_time_font_tuple && clay_vibe_tuple && clay_show_qt_tuple && clay_show_bt_tuple
         && clay_show_bt_disconnect_tuple && clay_show_am_pm_tuple && clay_color_saturday_tuple && clay_color_sunday_tuple
         && clay_color_us_federal_tuple && clay_holiday_set_1_tuple && clay_holiday_set_2_tuple
-        && clay_color_holiday_1_tuple && clay_color_holiday_2_tuple && clay_color_time_tuple && clay_day_night_shading_tuple) {
+        && clay_color_holiday_1_tuple && clay_color_holiday_2_tuple && clay_color_time_tuple && clay_day_night_shading_tuple
+        && clay_show_feels_like_tuple && clay_color_feels_like_tuple) {
         // Clay config data received
         bool clay_celsius = (bool) (clay_celsius_tuple->value->int16);
         bool time_lead_zero = (bool) (clay_time_lead_zero_tuple->value->int16);
@@ -128,6 +136,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         bool show_bt_disconnect = (bool) (clay_show_bt_disconnect_tuple->value->int16);
         bool show_am_pm = (bool) (clay_show_am_pm_tuple->value->int16);
         bool day_night_shading = (bool) (clay_day_night_shading_tuple->value->int16);
+        bool show_feels_like = (bool) (clay_show_feels_like_tuple->value->int16);
         int16_t time_font = clay_time_font_tuple->value->int16;
         GColor color_today = GColorFromHEX(clay_color_today_tuple->value->int32);
         GColor color_saturday = GColorFromHEX(clay_color_saturday_tuple->value->int32);
@@ -138,6 +147,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         GColor color_holiday_1 = GColorFromHEX(clay_color_holiday_1_tuple->value->int32);
         GColor color_holiday_2 = GColorFromHEX(clay_color_holiday_2_tuple->value->int32);
         GColor color_time = GColorFromHEX(clay_color_time_tuple->value->int32);
+        GColor color_feels_like = GColorFromHEX(clay_color_feels_like_tuple->value->int32);
         Config config = (Config) {
             .celsius = clay_celsius,
             .time_lead_zero = time_lead_zero,
@@ -151,10 +161,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
             .show_bt = show_bt,
             .show_bt_disconnect = show_bt_disconnect,
             .show_am_pm = show_am_pm,
+            .show_feels_like = show_feels_like,
             .color_saturday = color_saturday,
             .color_sunday = color_sunday,
             .color_us_federal = color_us_federal,
             .color_time = color_time,
+            .color_feels_like = color_feels_like,
             .day_night_shading = day_night_shading,
             .holiday_set_1 = holiday_set_1,
             .holiday_set_2 = holiday_set_2,

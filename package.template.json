@@ -1,7 +1,7 @@
 {
   "name": "yaforecaswatch2",
   "author": "Matt Rossman",
-  "version": "1.34.5",
+  "version": "1.34.6",
   "buildProfile": "{{buildProfile}}",
   "keywords": [
     "pebble-app"
@@ -71,6 +71,7 @@
     ],
     "messageKeys": [
       "TEMP_TREND_INT16",
+      "FEELS_LIKE_TREND_INT16",
       "PRECIP_TREND_UINT8",
       "UV_TREND_UINT8",
       "FORECAST_START",
@@ -101,6 +102,8 @@
       "CLAY_COLOR_HOLIDAY_2",
       "CLAY_COLOR_TIME",
       "CLAY_DAY_NIGHT_SHADING",
+      "CLAY_SHOW_FEELS_LIKE",
+      "CLAY_COLOR_FEELS_LIKE",
       "HOLIDAY_SLOT",
       "HOLIDAY_SET",
       "HOLIDAY_YEAR",
