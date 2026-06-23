@@ -69,7 +69,12 @@ WundergroundProvider.prototype.withWundergroundCurrent = function(lat, lon, apiK
                 return;
             }
 
-            callback(weatherData.temperature);
+            callback({
+                temp: weatherData.temperature,
+                feelsLike: typeof weatherData.temperatureFeelsLike === 'number'
+                    ? weatherData.temperatureFeelsLike
+                    : null
+            });
         }).bind(this),
         function(error) {
             onFailure({ stage: 'provider_data', code: 'wu_current_' + error.code });
@@ -230,10 +235,11 @@ WundergroundProvider.prototype.withProviderData = function(lat, lon, force, onSu
         }).bind(this);
 
         this.withWundergroundCurrent(lat, lon, apiKey, function(value) {
-            currentTemp = value;
+            currentTemp = value.temp;
+            this.currentFeelsLike = value.feelsLike;
             currentReady = true;
             complete();
-        }, failOnce);
+        }.bind(this), failOnce);
         this.withWundergroundForecast(lat, lon, apiKey, function(value) {
             forecast = value;
             forecastReady = true;

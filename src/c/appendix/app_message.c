@@ -20,6 +20,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Tuple *forecast_start_tuple = dict_find(iterator, MESSAGE_KEY_FORECAST_START);
     Tuple *num_entries_tuple = dict_find(iterator, MESSAGE_KEY_NUM_ENTRIES);
     Tuple *current_temp_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_TEMP);
+    Tuple *current_feels_like_tuple = dict_find(iterator, MESSAGE_KEY_CURRENT_FEELS_LIKE);
     Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
     Tuple *sun_events_tuple = dict_find(iterator, MESSAGE_KEY_SUN_EVENTS);
     Tuple *debug_fetch_error_tuple = dict_find(iterator, MESSAGE_KEY_DEBUG_FETCH_ERROR);
@@ -83,6 +84,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         persist_set_temp_lo(lo);
         persist_set_temp_hi(hi);
         persist_set_current_temp((int)current_temp_tuple->value->int32);
+        persist_set_current_feels_like(current_feels_like_tuple
+            ? (int)current_feels_like_tuple->value->int32
+            : -32768);
         uint8_t sun_event_start_type = (uint8_t) sun_events_tuple->value->uint8;
         time_t *sun_event_times = (time_t*) (sun_events_tuple->value->data + 1);
         persist_set_sun_event_start_type(sun_event_start_type);

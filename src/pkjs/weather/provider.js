@@ -615,6 +615,9 @@ WeatherProvider.prototype.getPayload = function() {
             ? Math.round(feelsLikeTrend[index])
             : -32768);
     }
+    var currentFeelsLike = typeof this.currentFeelsLike === 'number' && isFinite(this.currentFeelsLike)
+        ? Math.round(this.currentFeelsLike)
+        : -32768;
     var precips = this.precipTrend.slice(0, this.numEntries).map(function(probability) {
         return Math.round(probability * 100);
     });
@@ -640,6 +643,7 @@ WeatherProvider.prototype.getPayload = function() {
         FORECAST_START: this.startTime,
         NUM_ENTRIES: this.numEntries,
         CURRENT_TEMP: Math.round(this.currentTemp),
+        CURRENT_FEELS_LIKE: currentFeelsLike,
         CITY: this.cityName,
         // The first byte determines whether the list of events starts on a sunrise (0) or sunset (1)
         SUN_EVENTS: [this.sunEvents[0].type === 'sunrise' ? 0 : 1].concat(sunEventsByteArray)

@@ -8,7 +8,7 @@ enum key {
     CURRENT_TEMP, BATTERY_LEVEL, CONFIG, UV_TREND, DEBUG_FETCH_ERROR,
     HOLIDAY_SLOT1_YEAR0, HOLIDAY_SLOT1_YEAR1, HOLIDAY_SLOT1_YEAR2,
     HOLIDAY_SLOT2_YEAR0, HOLIDAY_SLOT2_YEAR1, HOLIDAY_SLOT2_YEAR2,
-    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND
+    DEBUG_WEATHER_STATE, FEELS_LIKE_TREND, CURRENT_FEELS_LIKE
 }; // Deprecated: BATTERY_LEVEL
 
 static int holiday_key(uint8_t slot, int16_t year) {
@@ -56,6 +56,9 @@ void persist_init() {
     if (!persist_exists(CURRENT_TEMP)) {
         persist_write_int(CURRENT_TEMP, 1);
     }
+    if (!persist_exists(CURRENT_FEELS_LIKE)) {
+        persist_write_int(CURRENT_FEELS_LIKE, -32768);
+    }
     if (!persist_exists(CITY)) {
         persist_write_string(CITY, "Koji");
     }
@@ -88,7 +91,9 @@ void persist_init() {
             .holiday_set_1 = HOLIDAY_SET_US,
             .holiday_set_2 = HOLIDAY_SET_NONE,
             .color_holiday_1 = GColorFolly,
-            .color_holiday_2 = GColorVividCerulean
+            .color_holiday_2 = GColorVividCerulean,
+            .show_feels_like = false,
+            .color_feels_like = GColorYellow
         };
         persist_set_config(config);
     }
@@ -145,6 +150,10 @@ int persist_get_num_entries() {
 
 int persist_get_current_temp() {
     return persist_read_int(CURRENT_TEMP);
+}
+
+int persist_get_current_feels_like() {
+    return persist_read_int(CURRENT_FEELS_LIKE);
 }
 
 int persist_get_city(char *buffer, const size_t buffer_size) {
@@ -237,6 +246,10 @@ void persist_set_num_entries(int val) {
 
 void persist_set_current_temp(int val) {
     persist_write_int(CURRENT_TEMP, val);
+}
+
+void persist_set_current_feels_like(int val) {
+    persist_write_int(CURRENT_FEELS_LIKE, val);
 }
 
 void persist_set_city(char *val) {

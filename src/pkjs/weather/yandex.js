@@ -616,6 +616,11 @@ function populateProviderFromCache(provider, primaryCache, supplementCache, grap
     provider.tempTrend = getTrendFromByTime(primaryByTime, graphWindowTimes, 'temp', fallbackTemp);
     provider.feelsLikeTrend = getTrendFromByTime(primaryByTime, graphWindowTimes, 'feelsLike',
         typeof primaryCache.currentFeelsLike === 'number' ? primaryCache.currentFeelsLike : null);
+    provider.currentFeelsLike = provider.feelsLikeTrend.length > 0
+        && typeof provider.feelsLikeTrend[0] === 'number'
+        && isFinite(provider.feelsLikeTrend[0])
+        ? provider.feelsLikeTrend[0]
+        : null;
     provider.precipTrend = [];
     provider.uvTrend = [];
 
@@ -899,6 +904,7 @@ YandexProvider.prototype.withProviderData = function(lat, lon, force, onSuccess,
         this.tempTrend = getTempTrendForWindow(hourly, graphWindowTimes, currentTemp);
         this.feelsLikeTrend = getFeelsLikeTrendForWindow(hourly, graphWindowTimes, currentFeelsLike);
         this.currentTemp = currentTemp;
+        this.currentFeelsLike = currentFeelsLike;
 
         finishWithSupplement = (function(openMeteoData) {
             var openMeteoCache = openMeteoData

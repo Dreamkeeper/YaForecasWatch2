@@ -108,6 +108,9 @@ OpenWeatherMapProvider.prototype.withProviderData = function(lat, lon, force, on
         });
         this.startTime = weatherData.hourly[0].dt;
         this.currentTemp = weatherData.current.temp;
+        this.currentFeelsLike = typeof weatherData.current.feels_like === 'number'
+            ? weatherData.current.feels_like
+            : null;
         onSuccess();
     }).bind(this), onFailure);
 };
