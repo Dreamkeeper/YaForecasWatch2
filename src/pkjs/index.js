@@ -1372,15 +1372,6 @@ function tryFetch(provider) {
     };
 }
 
-function roundDownMinutes(date, minuteMod) {
-    // E.g. with minuteMod=30, 3:52 would roll back to 3:30
-    var out = new Date(date);
-    out.setMinutes(date.getMinutes() - (date.getMinutes() % minuteMod));
-    out.setSeconds(0);
-    out.setMilliseconds(0);
-    return out;
-}
-
 function getRefreshMinutes(provider) {
     if (provider && provider.id === 'yandex') {
         return YANDEX_WEATHER_REFRESH_MINUTES;
@@ -1389,18 +1380,61 @@ function getRefreshMinutes(provider) {
     return DEFAULT_WEATHER_REFRESH_MINUTES;
 }
 
+/**
+ * Return true when a previous provider failure cooldown has expired.
+ *
+ * @param {string} providerId Weather provider id.
+ * @returns {boolean} True when a retry should be attempted now.
+ */
+function hasExpiredFetchBackoff(providerId) {
+    var backoffMap = readFetchBackoffMap();
+    var record = providerId ? backoffMap[providerId] : null;
+
+    return Boolean(record && typeof record.until === 'number' && Date.now() >= record.until);
+}
+
+/**
+ * Parse a stored fetch status timestamp.
+ *
+ * @param {string|null} statusString JSON fetch status string from localStorage.
+ * @returns {number|null} Unix milliseconds, or null when missing/invalid.
+ */
+function parseFetchStatusTime(statusString) {
+    var status;
+    var timestamp;
+
+    if (statusString === null) {
+        return null;
+    }
+
+    try {
+        status = JSON.parse(statusString);
+    }
+    catch (ex) {
+        return null;
+    }
+
+    if (!status || status.time === null) {
+        return null;
+    }
+
+    timestamp = new Date(status.time).getTime();
+    return isFinite(timestamp) ? timestamp : null;
+}
+
 function needRefresh(provider) {
     var refreshMinutes = getRefreshMinutes(provider);
+    var lastFetchSuccessTime;
+
+    if (hasExpiredFetchBackoff(provider && provider.id)) {
+        return true;
+    }
 
     // If the weather has never been fetched
-    var lastFetchSuccessString = localStorage.getItem(KEY_LAST_FETCH_SUCCESS);
-    if (lastFetchSuccessString === null) {
+    lastFetchSuccessTime = parseFetchStatusTime(localStorage.getItem(KEY_LAST_FETCH_SUCCESS));
+    if (lastFetchSuccessTime === null) {
         return true;
     }
-    var lastFetchSuccess = JSON.parse(lastFetchSuccessString);
-    if (lastFetchSuccess.time === null) {
-        // Just covering all my bases
-        return true;
-    }
-    return (Date.now() - roundDownMinutes(new Date(lastFetchSuccess.time), refreshMinutes) > 1000 * 60 * refreshMinutes);
+
+    return Date.now() - lastFetchSuccessTime >= 1000 * 60 * refreshMinutes;
 }
